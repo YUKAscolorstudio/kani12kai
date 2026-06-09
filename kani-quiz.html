@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>冠位十二階 COLOR & HISTORY GAME</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:linear-gradient(160deg,#1a0a2e 0%,#0d1b3e 40%,#0a2a1a 100%);min-height:100vh;font-family:'Noto Serif JP','Georgia',serif;color:#f0e8d8}
+    .card{background:rgba(255,255,255,0.05);border:1px solid rgba(200,180,120,0.2);border-radius:16px;padding:20px;backdrop-filter:blur(10px)}
+    .gold-btn{background:linear-gradient(135deg,#b8860b,#d4a017,#b8860b);color:#1a0a2e;border:none;padding:13px 32px;border-radius:40px;font-size:15px;font-weight:900;font-family:'Noto Serif JP',serif;cursor:pointer;letter-spacing:2px;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 18px rgba(184,134,11,.4)}
+    .gold-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(184,134,11,.6)}
+    .ghost-btn{background:transparent;border:1.5px solid rgba(200,180,120,0.4);color:#d4b896;padding:9px 22px;border-radius:40px;font-size:13px;font-family:'Noto Serif JP',serif;cursor:pointer;transition:all .2s}
+    .ghost-btn:hover{background:rgba(200,180,120,.1)}
+    .btn-choice{width:100%;padding:13px 15px;margin-bottom:9px;border-radius:10px;border:2px solid rgba(200,180,120,.3);background:rgba(255,255,255,.06);color:#f0e8d8;font-size:14px;font-family:'Noto Serif JP',serif;text-align:left;cursor:pointer;transition:all .2s;line-height:1.5}
+    .btn-choice:hover:not(:disabled){background:rgba(200,180,120,.18);border-color:rgba(200,180,120,.7)}
+    .btn-choice.correct{background:rgba(76,175,80,.25);border-color:#4caf50}
+    .btn-choice.wrong{background:rgba(244,67,54,.25);border-color:#f44336}
+    .btn-choice.dim{opacity:.45}
+    .tab{padding:7px 18px;border-radius:20px;cursor:pointer;font-size:12px;border:none;font-family:'Noto Serif JP',serif;transition:all .2s}
+    .tab.on{background:rgba(200,180,120,.25);color:#d4a017}
+    .tab.off{background:transparent;color:rgba(200,180,120,.45)}
+    .swatch-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(200,180,120,.1)}
+    .mode-card{border-radius:16px;padding:20px;cursor:pointer;transition:all .25s;border:2px solid transparent}
+    .mode-card:hover{transform:translateY(-3px)}
+    @keyframes levelup{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+    .levelup-anim{animation:levelup .5s ease}
+    @keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .fadein{animation:fadein .35s ease}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+const KANI_DATA = [
+  { kani:'大徳', color:'濃紫', hex:'#4a0072', rank:1 },
+  { kani:'小徳', color:'薄紫', hex:'#9b59b6', rank:2 },
+  { kani:'大仁', color:'濃青', hex:'#1a1a6b', rank:3 },
+  { kani:'小仁', color:'薄青', hex:'#4a90d9', rank:4 },
+  { kani:'大礼', color:'濃赤', hex:'#8b0000', rank:5 },
+  { kani:'小礼', color:'薄赤', hex:'#c0392b', rank:6 },
+  { kani:'大信', color:'濃黄', hex:'#b8860b', rank:7 },
+  { kani:'小信', color:'薄黄', hex:'#c8b400', rank:8 },
+  { kani:'大義', color:'濃白', hex:'#d0d0d0', rank:9 },
+  { kani:'小義', color:'薄白', hex:'#ebebeb', rank:10 },
+  { kani:'大智', color:'濃黒', hex:'#1a1a1a', rank:11 },
+  { kani:'小智', color:'薄黒', hex:'#5a4a3a', rank:12 },
+];
+
+const RP_RANKS = [
+  { title:'初位の官人', color:'浅縹', hex:'#4a90d9', desc:'朝廷に仕えたばかりの若き官人。' },
+  { title:'八位の官人', color:'深縹', hex:'#1a3a6b', desc:'実直さが認められ、一段昇進した。' },
+  { title:'七位の官人', color:'浅緑', hex:'#5d9c59', desc:'緑の衣が板についてきた。' },
+  { title:'六位の官人', color:'深緑', hex:'#1a5c1a', desc:'深い緑の衣を纏う中堅官人。' },
+  { title:'五位の官人', color:'浅緋', hex:'#c0392b', desc:'緋色の衣。宮中での発言力が増した。' },
+  { title:'四位の官人', color:'深緋', hex:'#8b0000', desc:'深緋の衣。天皇に拝謁できる高位。' },
+  { title:'三位の公卿', color:'浅紫', hex:'#9c6bc9', desc:'浅紫の衣。公卿の列に加わった！' },
+  { title:'一位の大臣', color:'深紫', hex:'#4a0080', desc:'深紫の衣。国政を担う最高位の臣！' },
+];
+
+const ALL_QUESTIONS = [
+  { id:1, level:'初級', question:'冠位十二階の最高位「大徳」の冠色は？', choices:['濃紫','濃青','濃赤','濃黄'], answer:0, hex:'#4a0072', explanation:'大徳の冠色は「濃紫」。紫は古代東アジアで最高位を示す色だった。' },
+  { id:2, level:'初級', question:'「小仁」の冠色は？', choices:['薄赤','薄青','薄黄','薄黒'], answer:1, hex:'#4a90d9', explanation:'小仁の冠色は「薄青」と推定されている。' },
+  { id:3, level:'初級', question:'「大智」の冠色は？', choices:['濃白','薄黒','濃黒','薄白'], answer:2, hex:'#1a1a1a', explanation:'大智の冠色は「濃黒」。下位に近い位には黒系が割り当てられた。' },
+  { id:4, level:'初級', question:'「大信」の冠色は？', choices:['濃赤','濃黄','濃青','濃白'], answer:1, hex:'#b8860b', explanation:'大信の冠色は「濃黄」。黄は信の徳を表す色とされた。' },
+  { id:5, level:'初級', question:'衣服令で八位の服色は？', choices:['深緑','浅緑','深縹','浅縹'], answer:2, explanation:'八位は「深縹（深い青）」。縹は青系の伝統色名。' },
+  { id:6, level:'中級', question:'衣服令で四位の服色は？', choices:['深紫','浅紫','深緋','浅緋'], answer:2, explanation:'四位は「深緋（こきひ）」。緋色は紫の次に格が高い色。' },
+  { id:7, level:'中級', question:'衣服令で六位の服色は？', choices:['浅緑','深緑','深縹','浅縹'], answer:1, explanation:'六位は「深緑」。緑系は下位の官人に用いられた。' },
+  { id:8, level:'中級', question:'次を位階の高い順に並べよ：①深緋 ②深紫 ③浅緑 ④浅紫', choices:['②→④→①→③','①→②→④→③','②→①→④→③','④→②→①→③'], answer:0, explanation:'深紫（1位）→浅紫（2〜3位）→深緋（4位）→浅緑（7位）の順。' },
+  { id:9, level:'中級', question:'「徳・仁・礼・信・義・智」は何の思想に基づくか？', choices:['仏教','道教','儒教','神道'], answer:2, explanation:'儒教の「五常（仁・義・礼・智・信）」に基づく。' },
+  { id:10, level:'中級', question:'親王（一品）の服色は？', choices:['浅紫','深紫','深緋','深緑'], answer:1, explanation:'親王一品・諸王一位・諸臣一位はすべて「深紫」。' },
+  { id:11, level:'上級', question:'冠位十二階が制定されたのは何年か？', choices:['593年','603年','645年','701年'], answer:1, explanation:'603年（推古天皇11年）に聖徳太子が制定した。' },
+  { id:12, level:'上級', question:'冠位十二階の主な目的は？', choices:['豪族の世襲強化','才能・功績による登用と中央集権化','仏教階位の政治応用','唐の科挙導入'], answer:1, explanation:'氏姓制度を改め、個人の徳・功績で登用する仕組みを作ることが目的。' },
+  { id:13, level:'上級', question:'冠位十二階と衣服令に共通する特徴は？', choices:['最上位に赤','紫が最高位の色','寒暖色のみ使用','黒が最高位'], answer:1, explanation:'両制度とも「紫」が最高位。中国・唐の影響を受けた東アジア共通の色彩文化。' },
+  { id:14, level:'上級', question:'A天皇の時代にB人物が制定、C部位の色で身分を示した。正しい組み合わせは？', choices:['A推古/B聖徳太子/C冠','A天智/B中臣鎌足/C服','A推古/B蘇我馬子/C服','A天武/B聖徳太子/C冠'], answer:0, explanation:'推古天皇の時代（603年）に聖徳太子が制定。冠の色で身分を示した。' },
+  { id:15, level:'上級', question:'各位に「大・小」の2段階が設けられた理由は？', choices:['年齢で区別','同じ徳目内で序列をつける','男女で冠色を分ける','場に応じて着替える'], answer:1, explanation:'6つの徳目それぞれに大・小を設け、合計12階で細かな序列を表した。' },
+  { id:16, level:'上級', question:'紫が高貴な色とされた背景で最も適切なものは？', choices:['顔料が安価','染色が容易','入手・染色が難しく希少','仏教経典に記載'], answer:2, explanation:'紫根染めは工程が複雑で原料が多量に必要。希少性が高貴さの根拠になった。' },
+];
+
+const IFUKU_DATA = [
+  { rank:'親王一品・諸王一位・諸臣一位', color:'深紫', hex:'#4a0080' },
+  { rank:'二位〜五位（諸王）・三位以上（諸臣）', color:'浅紫', hex:'#9c6bc9' },
+  { rank:'四位', color:'深緋', hex:'#8b0000' },
+  { rank:'五位', color:'浅緋', hex:'#c0392b' },
+  { rank:'六位', color:'深緑', hex:'#1a5c1a' },
+  { rank:'七位', color:'浅緑', hex:'#5d9c59' },
+  { rank:'八位', color:'深縹', hex:'#1a3a6b' },
+  { rank:'初位', color:'浅縹', hex:'#4a90d9' },
+];
+
+const LEVEL_COLOR = { 初級:{badge:'#4caf50'}, 中級:{badge:'#ff9800'}, 上級:{badge:'#e91e63'} };
+
+function shuffle4(all, correct) {
+  const others = all.filter(x => x !== correct).sort(() => Math.random() - 0.5).slice(0, 3);
+  return [...others, correct].sort(() => Math.random() - 0.5);
+}
+
+const COLOR_DON_QUESTIONS = KANI_DATA.map((d, i) => ({
+  id: 100 + i, hex: d.hex, answer: d.kani, colorName: d.color,
+  choices: shuffle4(KANI_DATA.map(x => x.kani), d.kani),
+}));
+
+function App() {
+  const [screen, setScreen] = useState('home');
+  const [mode, setMode] = useState('quiz');
+  const [selectedLevel, setSelectedLevel] = useState('初級');
+  const [questions, setQuestions] = useState([]);
+  const [current, setCurrent] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [answered, setAnswered] = useState(false);
+  const [score, setScore] = useState(0);
+  const [results, setResults] = useState([]);
+  const [showExp, setShowExp] = useState(false);
+  const [tab, setTab] = useState('chart');
+  const [donLevel, setDonLevel] = useState('初級');
+  const [donQ, setDonQ] = useState(null);
+  const [donSelected, setDonSelected] = useState(null);
+  const [donAnswered, setDonAnswered] = useState(false);
+  const [donScore, setDonScore] = useState(0);
+  const [donCount, setDonCount] = useState(0);
+  const donTotal = 8;
+  const [donQueue, setDonQueue] = useState([]);
+  const [rpRank, setRpRank] = useState(0);
+  const [rpQ, setRpQ] = useState(null);
+  const [rpSelected, setRpSelected] = useState(null);
+  const [rpAnswered, setRpAnswered] = useState(false);
+  const [rpStreak, setRpStreak] = useState(0);
+  const [rpLevelUp, setRpLevelUp] = useState(false);
+  const [rpUsed, setRpUsed] = useState([]);
+  const [rpFailed, setRpFailed] = useState(false);
+
+  const startQuiz = useCallback(() => {
+    const pool = ALL_QUESTIONS.filter(q => q.level === selectedLevel);
+    const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(8, pool.length));
+    setQuestions(shuffled); setCurrent(0); setSelected(null);
+    setAnswered(false); setScore(0); setResults([]); setShowExp(false);
+    setScreen('quiz');
+  }, [selectedLevel]);
+
+  const handleSelect = (idx) => {
+    if (answered) return;
+    setSelected(idx); setAnswered(true);
+    const q = questions[current];
+    const ok = idx === q.answer;
+    if (ok) setScore(s => s + 1);
+    setResults(r => [...r, { q, selected: idx, correct: ok }]);
+  };
+
+  const nextQ = () => {
+    if (current + 1 >= questions.length) { setScreen('result'); return; }
+    setCurrent(c => c + 1); setSelected(null); setAnswered(false); setShowExp(false);
+  };
+
+  const startColorDon = useCallback(() => {
+    const q = [...COLOR_DON_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, donTotal);
+    setDonQueue(q); setDonQ(q[0]); setDonScore(0); setDonCount(0);
+    setDonSelected(null); setDonAnswered(false);
+    setScreen('colordon');
+  }, [donLevel]);
+
+  const handleDon = (choice) => {
+    if (donAnswered || !donQ) return;
+    setDonSelected(choice); setDonAnswered(true);
+    if (choice === donQ.answer) setDonScore(s => s + 1);
+  };
+
+  const nextDon = () => {
+    const next = donCount + 1;
+    if (next >= donTotal) { setScreen('donresult'); return; }
+    setDonCount(next); setDonQ(donQueue[next]);
+    setDonSelected(null); setDonAnswered(false);
+  };
+
+  const rpPickQ = useCallback((used) => {
+    const pool = ALL_QUESTIONS.filter(q => !used.includes(q.id));
+    if (pool.length === 0) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }, []);
+
+  const startRoleplay = useCallback(() => {
+    setRpRank(0); setRpStreak(0); setRpUsed([]); setRpLevelUp(false); setRpFailed(false);
+    const q = rpPickQ([]);
+    setRpQ(q); setRpSelected(null); setRpAnswered(false);
+    setScreen('roleplay');
+  }, [rpPickQ]);
+
+  const handleRp = (idx) => {
+    if (rpAnswered || !rpQ) return;
+    setRpSelected(idx); setRpAnswered(true);
+    const ok = idx === rpQ.answer;
+    if (ok) {
+      const ns = rpStreak + 1; setRpStreak(ns);
+      if (ns % 2 === 0 && rpRank < RP_RANKS.length - 1) { setRpLevelUp(true); setRpRank(r => r + 1); }
+    } else { setRpFailed(true); }
+  };
+
+  const nextRp = () => {
+    if (rpFailed) { setScreen('rpresult'); return; }
+    if (!rpQ) return;
+    const newUsed = [...rpUsed, rpQ.id];
+    setRpUsed(newUsed); setRpLevelUp(false); setRpFailed(false);
+    if (rpRank >= RP_RANKS.length - 1) { setScreen('rpresult'); return; }
+    const q = rpPickQ(newUsed);
+    if (!q) { setScreen('rpresult'); return; }
+    setRpQ(q); setRpSelected(null); setRpAnswered(false);
+  };
+
+  const q = questions[current];
+  const pct = questions.length ? Math.round((score / questions.length) * 100) : 0;
+  const donPct = Math.round((donScore / donTotal) * 100);
+  const curRank = RP_RANKS[rpRank];
+
+  return (
+    <div style={{minHeight:'100vh',padding:0}}>
+
+      {/* HOME */}
+      {screen === 'home' && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'28px 18px'}}>
+          <div style={{textAlign:'center',marginBottom:28}}>
+            <div style={{fontSize:44,marginBottom:6}}>👑</div>
+            <h1 style={{fontSize:24,fontWeight:900,letterSpacing:4,lineHeight:1.3}}>
+              冠位十二階<br/>
+              <span style={{fontSize:12,fontWeight:400,color:'#c8a86b',letterSpacing:5}}>COLOR & HISTORY GAME</span>
+            </h1>
+          </div>
+          <p style={{fontSize:12,color:'#c8a86b',letterSpacing:2,marginBottom:12}}>▶ モードを選ぶ</p>
+
+          {/* Quiz card */}
+          <div className="mode-card" style={{background:'rgba(184,134,11,.12)',borderColor:mode==='quiz'?'#d4a017':'rgba(184,134,11,.25)',marginBottom:10}} onClick={()=>setMode('quiz')}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <span style={{fontSize:28}}>📜</span>
+              <div>
+                <div style={{fontWeight:900,fontSize:15}}>クイズモード</div>
+                <div style={{fontSize:12,color:'rgba(200,180,120,.7)',marginTop:3}}>難易度を選んで8問チャレンジ</div>
+              </div>
+              {mode==='quiz' && <span style={{marginLeft:'auto',color:'#d4a017',fontSize:18}}>✓</span>}
+            </div>
+            {mode==='quiz' && (
+              <div style={{display:'flex',gap:8,marginTop:14}}>
+                {['初級','中級','上級'].map(lv => {
+                  const on = selectedLevel === lv;
+                  const col = LEVEL_COLOR[lv].badge;
+                  return (
+                    <button key={lv} onClick={e=>{e.stopPropagation();setSelectedLevel(lv)}} style={{
+                      flex:1,padding:'9px 0',borderRadius:8,border:`2px solid ${on?col:'rgba(255,255,255,.15)'}`,
+                      background:on?`${col}22`:'transparent',color:on?col:'rgba(255,255,255,.35)',
+                      fontFamily:'Noto Serif JP,serif',fontWeight:700,fontSize:13,cursor:'pointer',
+                      boxShadow:on?`0 0 8px ${col}44`:'none',transition:'all .2s'
+                    }}>{lv}</button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Color Don card */}
+          <div className="mode-card" style={{background:'rgba(76,175,80,.1)',borderColor:mode==='colordon'?'#4caf50':'rgba(76,175,80,.2)',marginBottom:10}} onClick={()=>setMode('colordon')}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <span style={{fontSize:28}}>🎨</span>
+              <div>
+                <div style={{fontWeight:900,fontSize:15}}>色ドン！モード</div>
+                <div style={{fontSize:12,color:'rgba(200,180,120,.7)',marginTop:3}}>大きな色を見て瞬間判断！8問連続</div>
+              </div>
+              {mode==='colordon' && <span style={{marginLeft:'auto',color:'#4caf50',fontSize:18}}>✓</span>}
+            </div>
+            {mode==='colordon' && (
+              <div style={{marginTop:12}}>
+                <div style={{display:'flex',gap:8}}>
+                  {['初級','中級','上級'].map(lv => {
+                    const on = donLevel === lv;
+                    const col = LEVEL_COLOR[lv].badge;
+                    return (
+                      <button key={lv} onClick={e=>{e.stopPropagation();setDonLevel(lv)}} style={{
+                        flex:1,padding:'8px 0',borderRadius:8,border:`2px solid ${on?col:'rgba(255,255,255,.15)'}`,
+                        background:on?`${col}22`:'transparent',color:on?col:'rgba(255,255,255,.35)',
+                        fontFamily:'Noto Serif JP,serif',fontWeight:700,fontSize:12,cursor:'pointer',
+                        boxShadow:on?`0 0 8px ${col}44`:'none',transition:'all .2s'
+                      }}>{lv}</button>
+                    );
+                  })}
+                </div>
+                <p style={{fontSize:11,color:'rgba(200,180,120,.5)',marginTop:8}}>
+                  {donLevel==='初級' && '初級：選択肢に色見本あり（見比べて答える）'}
+                  {donLevel==='中級' && '中級：色見本なし（位名だけで判断）'}
+                  {donLevel==='上級' && '上級：逆問題！位名→4色パネルから正しい色を選ぶ'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Roleplay card */}
+          <div className="mode-card" style={{background:'rgba(156,107,201,.12)',borderColor:mode==='roleplay'?'#9c6bc9':'rgba(156,107,201,.25)',marginBottom:22}} onClick={()=>setMode('roleplay')}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <span style={{fontSize:28}}>👘</span>
+              <div>
+                <div style={{fontWeight:900,fontSize:15}}>官人ロールプレイ</div>
+                <div style={{fontSize:12,color:'rgba(200,180,120,.7)',marginTop:3}}>初位から正解で昇進！衣の色が変わる</div>
+              </div>
+              {mode==='roleplay' && <span style={{marginLeft:'auto',color:'#9c6bc9',fontSize:18}}>✓</span>}
+            </div>
+          </div>
+
+          <div style={{textAlign:'center',marginBottom:24}}>
+            <button className="gold-btn" onClick={()=>{
+              if(mode==='quiz') startQuiz();
+              else if(mode==='colordon') startColorDon();
+              else startRoleplay();
+            }}>はじめる ▶</button>
+          </div>
+
+          <div className="card">
+            <div style={{display:'flex',gap:6,marginBottom:14}}>
+              <button className={`tab ${tab==='chart'?'on':'off'}`} onClick={()=>setTab('chart')}>冠色一覧</button>
+              <button className={`tab ${tab==='ifuku'?'on':'off'}`} onClick={()=>setTab('ifuku')}>衣服令対応</button>
+            </div>
+            {tab==='chart' && (
+              <div>
+                <p style={{fontSize:11,color:'rgba(200,180,120,.6)',marginBottom:8}}>冠位十二階 冠色（現代的解釈による推定）</p>
+                {KANI_DATA.map(d => (
+                  <div key={d.kani} className="swatch-row">
+                    <div style={{width:34,height:20,borderRadius:4,background:d.hex,border:'1px solid rgba(255,255,255,.2)',flexShrink:0}}/>
+                    <span style={{width:42,fontSize:14,fontWeight:700,color:'#f0e8d8'}}>{d.kani}</span>
+                    <span style={{fontSize:13,color:'#f0e8d8',fontWeight:700}}>{d.color}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tab==='ifuku' && (
+              <div>
+                <p style={{fontSize:11,color:'rgba(200,180,120,.6)',marginBottom:8}}>衣服令 位階と服色</p>
+                {IFUKU_DATA.map(d => (
+                  <div key={d.rank} className="swatch-row">
+                    <div style={{width:34,height:20,borderRadius:4,background:d.hex,border:'1px solid rgba(255,255,255,.2)',flexShrink:0}}/>
+                    <span style={{fontSize:12,color:'#d4a017',width:48,flexShrink:0,fontWeight:700}}>{d.color}</span>
+                    <span style={{fontSize:11,color:'#f0e8d8',lineHeight:1.4}}>{d.rank}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* QUIZ */}
+      {screen==='quiz' && q && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'22px 18px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:18}}>
+            <button className="ghost-btn" style={{padding:'5px 14px',fontSize:12}} onClick={()=>setScreen('home')}>← 戻る</button>
+            <div style={{flex:1,height:5,background:'rgba(255,255,255,.1)',borderRadius:3}}>
+              <div style={{width:`${((current+1)/questions.length)*100}%`,height:'100%',background:'linear-gradient(90deg,#b8860b,#d4a017)',borderRadius:3,transition:'width .3s'}}/>
+            </div>
+            <span style={{fontSize:12,color:'#c8a86b',whiteSpace:'nowrap'}}>{current+1}/{questions.length}</span>
+          </div>
+          <div className="card fadein" style={{marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <span style={{padding:'2px 10px',borderRadius:20,fontSize:11,fontWeight:700,background:`${LEVEL_COLOR[q.level].badge}33`,color:LEVEL_COLOR[q.level].badge}}>{q.level}</span>
+            </div>
+            {q.hex && <div style={{width:'100%',height:70,borderRadius:10,background:q.hex,marginBottom:14,border:'1px solid rgba(255,255,255,.15)'}}/>}
+            <p style={{fontSize:15,lineHeight:1.8}}>{q.question}</p>
+          </div>
+          {q.choices.map((c,i) => {
+            let cls = 'btn-choice';
+            if(answered){ if(i===q.answer) cls+=' correct'; else if(i===selected) cls+=' wrong'; else cls+=' dim'; }
+            return (
+              <button key={i} className={cls} onClick={()=>handleSelect(i)} disabled={answered}>
+                <span style={{color:'rgba(200,180,120,.7)',marginRight:8}}>{['A','B','C','D'][i]}.</span>{c}
+              </button>
+            );
+          })}
+          {answered && (
+            <div className="fadein" style={{marginTop:6}}>
+              <div style={{padding:'11px 14px',borderRadius:10,background:selected===q.answer?'rgba(76,175,80,.15)':'rgba(244,67,54,.15)',border:`1px solid ${selected===q.answer?'#4caf50':'#f44336'}`,marginBottom:10}}>
+                <span style={{fontSize:16,marginRight:6}}>{selected===q.answer?'⭕':'❌'}</span>
+                <span style={{fontSize:14,fontWeight:700}}>{selected===q.answer?'正解！':'不正解'}</span>
+              </div>
+              {showExp
+                ? <div style={{padding:'11px 13px',borderRadius:10,background:'rgba(200,180,120,.08)',border:'1px solid rgba(200,180,120,.2)',fontSize:12,lineHeight:1.8,color:'#d4b896',marginBottom:10}}>💡 {q.explanation}</div>
+                : <button className="ghost-btn" style={{marginBottom:10,fontSize:12}} onClick={()=>setShowExp(true)}>解説を見る</button>
+              }
+              <div style={{textAlign:'right'}}>
+                <button className="gold-btn" onClick={nextQ} style={{padding:'11px 26px',fontSize:14}}>
+                  {current+1>=questions.length?'結果を見る':'次の問題 →'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* QUIZ RESULT */}
+      {screen==='result' && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'30px 18px'}}>
+          <div style={{textAlign:'center',marginBottom:24}}>
+            <div style={{fontSize:44,marginBottom:6}}>{pct>=80?'🏆':pct>=50?'📜':'🪔'}</div>
+            <h2 style={{fontSize:20,fontWeight:900,letterSpacing:3}}>結果発表</h2>
+            <div style={{marginTop:14,fontSize:52,fontWeight:900,color:'#d4a017'}}>
+              {score}<span style={{fontSize:22,color:'rgba(200,180,120,.7)'}}>/{questions.length}</span>
+            </div>
+            <div style={{fontSize:18,marginTop:4,color:pct>=80?'#4caf50':pct>=50?'#ff9800':'#f44336'}}>正解率 {pct}%</div>
+            <p style={{marginTop:10,fontSize:13,color:'rgba(200,180,120,.7)'}}>
+              {pct===100?'完璧！すべての問いを制した。':pct>=80?'素晴らしい！色彩、しっかり身についている。':pct>=50?'あと一息。もう一度挑戦しよう。':'基礎から固めよう。'}
+            </p>
+          </div>
+          <div className="card" style={{marginBottom:20}}>
+            {results.map((r,i) => (
+              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,.07)',fontSize:13}}>
+                <span>{r.correct?'⭕':'❌'}</span>
+                <span style={{flex:1,color:r.correct?'#c8e6c9':'#ffcdd2',lineHeight:1.4}}>{r.q.question.slice(0,30)}…</span>
+              </div>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+            <button className="ghost-btn" onClick={()=>setScreen('home')}>← トップへ</button>
+            <button className="gold-btn" onClick={startQuiz}>もう一度 ▶</button>
+          </div>
+        </div>
+      )}
+
+      {/* COLOR DON */}
+      {screen==='colordon' && donQ && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'22px 18px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+            <button className="ghost-btn" style={{padding:'5px 14px',fontSize:12}} onClick={()=>setScreen('home')}>← 戻る</button>
+            <div style={{flex:1,height:5,background:'rgba(255,255,255,.1)',borderRadius:3}}>
+              <div style={{width:`${((donCount+1)/donTotal)*100}%`,height:'100%',background:'linear-gradient(90deg,#4caf50,#81c784)',borderRadius:3,transition:'width .3s'}}/>
+            </div>
+            <span style={{fontSize:12,color:'#c8a86b',whiteSpace:'nowrap'}}>{donCount+1}/{donTotal}</span>
+          </div>
+          <p style={{textAlign:'center',fontSize:13,color:'rgba(200,180,120,.7)',marginBottom:10}}>
+            {donLevel==='上級' ? `「${donQ.answer}」の色はどれ？` : 'この色の位は？'}
+          </p>
+          {donLevel !== '上級' && (
+            <div className="fadein" style={{width:'100%',height:200,borderRadius:20,background:donQ.hex,marginBottom:20,border:'2px solid rgba(255,255,255,.15)',boxShadow:`0 0 60px ${donQ.hex}88`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              {donAnswered && <div style={{background:'rgba(0,0,0,.55)',padding:'8px 20px',borderRadius:12,fontSize:16,fontWeight:900,color:'#fff'}}>{donQ.colorName}</div>}
+            </div>
+          )}
+          {donLevel === '上級' && (
+            <div className="fadein" style={{width:'100%',height:120,borderRadius:20,marginBottom:20,border:'2px solid rgba(200,180,120,.3)',background:'rgba(255,255,255,.05)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span style={{fontSize:38,fontWeight:900,letterSpacing:6,color:'#f0e8d8'}}>{donQ.answer}</span>
+            </div>
+          )}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+            {donQ.choices.map((c,i) => {
+              const kd = KANI_DATA.find(x => x.kani === c);
+              let bg='rgba(255,255,255,.07)', border='1.5px solid rgba(200,180,120,.25)';
+              if(donAnswered){
+                if(c===donQ.answer){bg='rgba(76,175,80,.3)';border='2px solid #4caf50';}
+                else if(c===donSelected){bg='rgba(244,67,54,.3)';border='2px solid #f44336';}
+                else{bg='rgba(255,255,255,.03)';border='1.5px solid rgba(255,255,255,.1)';}
+              }
+              if(donLevel==='上級') {
+                return (
+                  <button key={i} onClick={()=>handleDon(c)} disabled={donAnswered} style={{
+                    padding:0,borderRadius:12,border,overflow:'hidden',cursor:'pointer',
+                    transition:'all .2s',position:'relative',height:80,
+                    background:kd?kd.hex:'#333',
+                    boxShadow:donAnswered&&c===donQ.answer?`0 0 20px ${kd?.hex}99`:'none',
+                  }}>
+                    {donAnswered && (
+                      <div style={{position:'absolute',inset:0,background:'rgba(0,0,0,.45)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,color:'#fff',fontFamily:"'Noto Serif JP',serif"}}>
+                        {c}{c===donQ.answer&&<span style={{marginLeft:4,color:'#4caf50'}}>✓</span>}
+                      </div>
+                    )}
+                  </button>
+                );
+              }
+              return (
+                <button key={i} onClick={()=>handleDon(c)} disabled={donAnswered} style={{
+                  padding:'14px 10px',borderRadius:12,border,background:bg,
+                  color:'#f0e8d8',fontFamily:"'Noto Serif JP',serif",fontWeight:700,fontSize:15,
+                  cursor:'pointer',transition:'all .2s',display:'flex',flexDirection:'column',alignItems:'center',gap:6,
+                }}>
+                  {donLevel==='初級' && kd && <div style={{width:28,height:18,borderRadius:4,background:kd.hex,border:'1px solid rgba(255,255,255,.2)'}}/>}
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+          {donAnswered && (
+            <div className="fadein">
+              <div style={{padding:'10px 14px',borderRadius:10,background:donSelected===donQ.answer?'rgba(76,175,80,.15)':'rgba(244,67,54,.15)',border:`1px solid ${donSelected===donQ.answer?'#4caf50':'#f44336'}`,marginBottom:12,textAlign:'center'}}>
+                <span style={{fontSize:15,fontWeight:700}}>{donSelected===donQ.answer?'⭕ 正解！':'❌ 不正解'}</span>
+                {donSelected!==donQ.answer&&<span style={{fontSize:13,color:'#f0e8d8',marginLeft:8}}>正解：{donQ.answer}</span>}
+              </div>
+              <div style={{textAlign:'right'}}>
+                <button className="gold-btn" onClick={nextDon} style={{padding:'11px 24px',fontSize:14}}>
+                  {donCount+1>=donTotal?'結果を見る':'次の色 →'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* DON RESULT */}
+      {screen==='donresult' && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'30px 18px',textAlign:'center'}}>
+          <div style={{fontSize:44,marginBottom:6}}>{donPct>=80?'🎨':'🖌️'}</div>
+          <h2 style={{fontSize:20,fontWeight:900,letterSpacing:3,marginBottom:14}}>色ドン！結果</h2>
+          <div style={{fontSize:52,fontWeight:900,color:'#4caf50'}}>
+            {donScore}<span style={{fontSize:22,color:'rgba(200,180,120,.7)'}}>/{donTotal}</span>
+          </div>
+          <div style={{fontSize:18,marginTop:4,color:donPct>=80?'#4caf50':donPct>=50?'#ff9800':'#f44336'}}>正解率 {donPct}%</div>
+          <p style={{marginTop:10,fontSize:13,color:'rgba(200,180,120,.7)',marginBottom:28}}>
+            {donPct===100?'完璧！全色を見抜いた！':donPct>=80?'さすが！色彩感覚が鋭い。':donPct>=50?'もう少し！色と位を覚えよう。':'繰り返して色を体で覚えよう。'}
+          </p>
+          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+            <button className="ghost-btn" onClick={()=>setScreen('home')}>← トップへ</button>
+            <button className="gold-btn" onClick={startColorDon}>もう一度 ▶</button>
+          </div>
+        </div>
+      )}
+
+      {/* ROLEPLAY */}
+      {screen==='roleplay' && rpQ && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'22px 18px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:18,padding:'12px 16px',borderRadius:14,background:'rgba(255,255,255,.05)',border:'1px solid rgba(200,180,120,.15)'}}>
+            <div style={{width:44,height:56,borderRadius:8,background:`linear-gradient(180deg,${curRank.hex} 60%,${curRank.hex}99 100%)`,border:'2px solid rgba(255,255,255,.2)',boxShadow:`0 0 16px ${curRank.hex}66`,flexShrink:0}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:'rgba(200,180,120,.6)',marginBottom:2}}>現在の位</div>
+              <div style={{fontSize:16,fontWeight:900,color:'#f0e8d8'}}>{curRank.title}</div>
+              <div style={{fontSize:11,color:curRank.hex,marginTop:2}}>服色：{curRank.color}</div>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:11,color:'rgba(200,180,120,.6)'}}>連続正解</div>
+              <div style={{fontSize:22,fontWeight:900,color:'#d4a017'}}>{rpStreak}</div>
+            </div>
+          </div>
+          {rpLevelUp && (
+            <div className="fadein levelup-anim" style={{textAlign:'center',padding:'12px',borderRadius:12,background:`${curRank.hex}33`,border:`2px solid ${curRank.hex}`,marginBottom:14}}>
+              <span style={{fontSize:20,marginRight:8}}>🎉</span>
+              <span style={{fontSize:15,fontWeight:900,color:curRank.hex}}>昇進！ → {curRank.title}</span>
+            </div>
+          )}
+          <div className="card fadein" style={{marginBottom:14}}>
+            <p style={{fontSize:11,color:'rgba(200,180,120,.6)',marginBottom:10}}>📜 問いに答えて昇進せよ</p>
+            <p style={{fontSize:15,lineHeight:1.8}}>{rpQ.question}</p>
+          </div>
+          {rpQ.choices.map((c,i) => {
+            let cls='btn-choice';
+            if(rpAnswered){if(i===rpQ.answer)cls+=' correct';else if(i===rpSelected)cls+=' wrong';else cls+=' dim';}
+            return (
+              <button key={i} className={cls} onClick={()=>handleRp(i)} disabled={rpAnswered}>
+                <span style={{color:'rgba(200,180,120,.7)',marginRight:8}}>{['A','B','C','D'][i]}.</span>{c}
+              </button>
+            );
+          })}
+          {rpAnswered && (
+            <div className="fadein" style={{marginTop:6}}>
+              <div style={{padding:'11px 14px',borderRadius:10,background:rpFailed?'rgba(244,67,54,.15)':'rgba(76,175,80,.15)',border:`1px solid ${rpFailed?'#f44336':'#4caf50'}`,marginBottom:10}}>
+                <span style={{fontSize:16,marginRight:6}}>{rpFailed?'❌':'⭕'}</span>
+                <span style={{fontSize:14,fontWeight:700}}>{rpFailed?'不正解…失脚してしまった。':'正解！'}</span>
+                {!rpFailed&&rpStreak%2===0&&rpRank>0&&<span style={{fontSize:12,color:'#d4a017',marginLeft:8}}>▲ 昇進！</span>}
+              </div>
+              <div style={{textAlign:'right'}}>
+                <button className="gold-btn" onClick={nextRp} style={{padding:'11px 24px',fontSize:14}}>
+                  {rpFailed?'結果を見る':rpRank>=RP_RANKS.length-1?'結果を見る':'次の問いへ →'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RP RESULT */}
+      {screen==='rpresult' && (
+        <div style={{maxWidth:460,margin:'0 auto',padding:'30px 18px',textAlign:'center'}}>
+          <div style={{fontSize:44,marginBottom:6}}>{rpRank>=6?'👑':rpRank>=4?'📜':'🪔'}</div>
+          <h2 style={{fontSize:20,fontWeight:900,letterSpacing:3,marginBottom:16}}>官位確定</h2>
+          <div style={{width:80,height:100,borderRadius:12,margin:'0 auto 16px',background:`linear-gradient(180deg,${curRank.hex} 60%,${curRank.hex}88 100%)`,border:'3px solid rgba(255,255,255,.3)',boxShadow:`0 0 40px ${curRank.hex}88`}}/>
+          <div style={{fontSize:22,fontWeight:900,marginBottom:4}}>{curRank.title}</div>
+          <div style={{fontSize:14,color:curRank.hex,marginBottom:8}}>服色：{curRank.color}</div>
+          <p style={{fontSize:13,color:'rgba(200,180,120,.7)',marginBottom:8}}>{curRank.desc}</p>
+          <p style={{fontSize:13,color:'rgba(200,180,120,.7)',marginBottom:28}}>連続正解数：{rpStreak}問</p>
+          <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+            <button className="ghost-btn" onClick={()=>setScreen('home')}>← トップへ</button>
+            <button className="gold-btn" onClick={startRoleplay}>再挑戦 ▶</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
